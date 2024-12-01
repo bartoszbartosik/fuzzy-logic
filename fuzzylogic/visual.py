@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 from fuzzylogic import FuzzyInferenceSystem
 
 
+
 def plot_membership_functions(fis: FuzzyInferenceSystem):
     fig, axs = plt.subplots(len(fis.universes), 1, figsize=(12, len(fis.universes) * 5))
     for i, (key, value) in enumerate(fis.universes.items()):

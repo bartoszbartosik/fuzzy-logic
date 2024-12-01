@@ -3,7 +3,7 @@ import numpy as np
 from invertedpendulum import InvertedPendulum, plot
 
 from fuzzylogic import FuzzyInferenceSystem
-from fuzzylogic.rules import conjunction, disjunction, implication
+from fuzzylogic.rules import negation, conjunction, disjunction, implication
 from fuzzylogic.memfunc import trimf, trapmf
 from fuzzylogic.visual import plot_membership_functions, plot_aggregation
 
@@ -15,9 +15,9 @@ def initialize_fis(s_0, plot=False):
     # --------------------- #
 
     fis = FuzzyInferenceSystem(
-        angle=np.arange(0, 361, 0.1),
-        ang_vel=np.arange(-6, 6, 0.1),
-        force=np.arange(-100, 101, 0.1)
+        angle=np.arange(0, 361, .1),
+        ang_vel=np.arange(-6, 6, .1),
+        force=np.arange(-100, 101, .1)
     )
 
 
@@ -26,31 +26,33 @@ def initialize_fis(s_0, plot=False):
     # ------------------------------------------- #
 
     # Angle
-    ang_small_left = trimf((359.5, 360, 360))
-    ang_moderate_left = trimf((355, 357, 360))
-    ang_big_left = trapmf((180, 180, 345, 360))
+    ang_small_left = trimf((330, 360, 360))
+    ang_moderate_left = trimf((240, 300, 360))
+    ang_big_left = trimf((180, 180, 330))
 
-    ang_small_right = trimf((0, 0, 0.5))
-    ang_moderate_right = trimf((0, 3, 5))
-    ang_big_right = trapmf((0, 15, 180, 180))
+    ang_small_right = trimf((0, 0, 30))
+    ang_moderate_right = trimf((0, 60, 120))
+    ang_big_right = trimf((30, 180, 180))
 
     # Angular velocity
-    ang_vel_small_left = trimf((-0.01, 0, 0))
-    ang_vel_moderate_left = trimf((-0.5, -0.1, 0))
+    ang_vel_small_left = trimf((-3, 0, 0))
+    ang_vel_moderate_left = trimf((-6, -3, 0))
     ang_vel_big_left = trimf((-6, -6, 0))
 
-    ang_vel_small_right = trimf((0, 0, 0.01))
-    ang_vel_moderate_right = trimf((0, 0.1, 0.5))
+    ang_vel_small_right = trimf((0, 0, 3))
+    ang_vel_moderate_right = trimf((0, 3, 6))
     ang_vel_big_right = trimf((0, 6, 6))
 
     # Force
-    force_small_left = trimf((-0.5, 0, 0))
-    force_moderate_left = trimf((-20, -8, -1))
-    force_big_left = trapmf((-100, -100, -30, -20))
+    force_neutral = trimf((-10, 0, 10))
 
-    force_small_right = trimf((0, 0, 0.5))
-    force_moderate_right = trimf((1, 8, 20))
-    force_big_right = trapmf((20, 30, 100, 100))
+    force_small_left = trimf((-50, 0, 0))
+    force_moderate_left = trimf((-100, -50, 0))
+    force_big_left = trapmf((-100, -100, -90, -50))
+
+    force_small_right = trimf((0, 0, 50))
+    force_moderate_right = trimf((0, 50, 100))
+    force_big_right = trapmf((50, 90, 100, 100))
 
     # Add membership functions to the FIS
     fis.add_membership_function('angle', 'small_left', ang_small_left)
@@ -65,6 +67,7 @@ def initialize_fis(s_0, plot=False):
     fis.add_membership_function('ang_vel', 'small_right', ang_vel_small_right)
     fis.add_membership_function('ang_vel', 'moderate_right', ang_vel_moderate_right)
     fis.add_membership_function('ang_vel', 'big_right', ang_vel_big_right)
+    fis.add_membership_function('force', 'neutral', force_neutral)
     fis.add_membership_function('force', 'small_left', force_small_left)
     fis.add_membership_function('force', 'moderate_left', force_moderate_left)
     fis.add_membership_function('force', 'big_left', force_big_left)
@@ -73,19 +76,16 @@ def initialize_fis(s_0, plot=False):
     fis.add_membership_function('force', 'big_right', force_big_right)
 
 
-    # ------------- #
-    #   R U L E S   #
-    # ------------- #
-
+    # Fuzzy rules
     # Rule 1: If angle is small_left and ang_vel is small_left then force is small_left
-    rule_1 = conjunction([ang_small_left, ang_vel_small_left], force_moderate_left)
+    rule_1 = conjunction([ang_small_left, ang_vel_small_left], force_neutral)
     # Rule 2: If angle is small_left and ang_vel is moderate_left then force is moderate_left
-    rule_2 = conjunction([ang_small_left, ang_vel_moderate_left], force_big_left)
+    rule_2 = conjunction([ang_small_left, ang_vel_moderate_left], force_moderate_left)
     # Rule 3: If angle is small_left and ang_vel is big_left then force is big_left
     rule_3 = conjunction([ang_small_left, ang_vel_big_left], force_big_left)
 
     # Rule 4: If angle is moderate_left and ang_vel is small_left then force is moderate_left
-    rule_4 = conjunction([ang_moderate_left, ang_vel_small_left], force_big_left)
+    rule_4 = conjunction([ang_moderate_left, ang_vel_small_left], force_moderate_left)
     # Rule 5: If angle is moderate_left and ang_vel is moderate_left then force is big_left
     rule_5 = conjunction([ang_moderate_left, ang_vel_moderate_left], force_big_left)
     # Rule 6: If angle is moderate_left and ang_vel is big_left then force is big_left
@@ -99,14 +99,14 @@ def initialize_fis(s_0, plot=False):
     rule_9 = conjunction([ang_big_left, ang_vel_big_left], force_big_left)
 
     # Rule 10: If angle is small_right and ang_vel is small_right then force is small_right
-    rule_10 = conjunction([ang_small_right, ang_vel_small_right], force_moderate_right)
+    rule_10 = conjunction([ang_small_right, ang_vel_small_right], force_neutral)
     # Rule 11: If angle is small_right and ang_vel is moderate_right then force is moderate_right
-    rule_11 = conjunction([ang_small_right, ang_vel_moderate_right], force_big_right)
+    rule_11 = conjunction([ang_small_right, ang_vel_moderate_right], force_moderate_right)
     # Rule 12: If angle is small_right and ang_vel is big_right then force is big_right
     rule_12 = conjunction([ang_small_right, ang_vel_big_right], force_big_right)
 
     # Rule 13: If angle is moderate_right and ang_vel is small_right then force is moderate_right
-    rule_13 = conjunction([ang_moderate_right, ang_vel_small_right], force_big_right)
+    rule_13 = conjunction([ang_moderate_right, ang_vel_small_right], force_moderate_right)
     # Rule 14: If angle is moderate_right and ang_vel is moderate_right then force is big_right
     rule_14 = conjunction([ang_moderate_right, ang_vel_moderate_right], force_big_right)
     # Rule 15: If angle is moderate_right and ang_vel is big_right then force is big_right
@@ -120,16 +120,16 @@ def initialize_fis(s_0, plot=False):
     rule_18 = conjunction([ang_big_right, ang_vel_big_right], force_big_right)
 
     # Rule 19: If angle is small_left and ang_vel is small_right then force is small_left
-    rule_19 = conjunction([ang_small_left, ang_vel_small_right], force_moderate_right)
+    rule_19 = conjunction([ang_small_left, ang_vel_small_right], force_neutral)
     # Rule 20: If angle is small_left and ang_vel is moderate_right then force is small_right
-    rule_20 = conjunction([ang_small_left, ang_vel_moderate_right], force_moderate_left)
+    rule_20 = conjunction([ang_small_left, ang_vel_moderate_right], force_small_left)
     # Rule 21: If angle is small_left and ang_vel is big_right then force is moderate_left
-    rule_21 = conjunction([ang_small_left, ang_vel_big_right], force_big_right)
+    rule_21 = conjunction([ang_small_left, ang_vel_big_right], force_moderate_right)
 
     # Rule 22: If angle is moderate_left and ang_vel is small_right then force is moderate_right
-    rule_22 = conjunction([ang_moderate_left, ang_vel_small_right], force_big_left)
+    rule_22 = conjunction([ang_moderate_left, ang_vel_small_right], force_moderate_left)
     # Rule 23: If angle is moderate_left and ang_vel is moderate_right then force is small_right
-    rule_23 = conjunction([ang_moderate_left, ang_vel_moderate_right], force_small_right)
+    rule_23 = conjunction([ang_moderate_left, ang_vel_moderate_right], force_neutral)
     # Rule 24: If angle is moderate_left and ang_vel is big_right then force is small_right
     rule_24 = conjunction([ang_moderate_left, ang_vel_big_right], force_small_right)
 
@@ -141,7 +141,7 @@ def initialize_fis(s_0, plot=False):
     rule_27 = conjunction([ang_big_left, ang_vel_big_right], force_big_left)
 
     # Rule 28: If angle is small_right and ang_vel is small_left then force is small_right
-    rule_28 = conjunction([ang_small_right, ang_vel_small_left], force_small_left)
+    rule_28 = conjunction([ang_small_right, ang_vel_small_left], force_neutral)
     # Rule 29: If angle is small_right and ang_vel is moderate_left then force is small_left
     rule_29 = conjunction([ang_small_right, ang_vel_moderate_left], force_small_right)
     # Rule 30: If angle is small_right and ang_vel is big_left then force is moderate_right
@@ -150,7 +150,7 @@ def initialize_fis(s_0, plot=False):
     # Rule 31: If angle is moderate_right and ang_vel is small_left then force is moderate_left
     rule_31 = conjunction([ang_moderate_right, ang_vel_small_left], force_moderate_right)
     # Rule 32: If angle is moderate_right and ang_vel is moderate_left then force is small_left
-    rule_32 = conjunction([ang_moderate_right, ang_vel_moderate_left], force_small_right)
+    rule_32 = conjunction([ang_moderate_right, ang_vel_moderate_left], force_neutral)
     # Rule 33: If angle is moderate_right and ang_vel is big_left then force is small_left
     rule_33 = conjunction([ang_moderate_right, ang_vel_big_left], force_small_right)
 
@@ -198,8 +198,6 @@ def initialize_fis(s_0, plot=False):
     fis.add_rule(rule_34)
     fis.add_rule(rule_35)
     fis.add_rule(rule_36)
-
-    # -----------------------
 
     if plot:
         fis.infer(np.array(s_0), 'force')
