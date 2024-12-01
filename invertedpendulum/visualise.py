@@ -1,13 +1,14 @@
 import itertools
 import os
 
+import numpy as np
 from matplotlib import gridspec, pyplot as plt, animation
 from matplotlib.patches import Rectangle
 from numpy import pi, sin, cos
 
 
 # VISUALIZE SIMULATION ON A GRAPH
-def plot(model, animate, save):
+def plot(model, fis, aggs, centroids, animate, save):
 
     # ASSIGN SELF.SOLUTION AND SELF.L AS LOCAL VARIABLES
     solution = model.solution
@@ -38,11 +39,11 @@ def plot(model, animate, save):
     if animate:
 
         # DEFINE 4x2 [rows x columns] SUBPLOTS GRID
-        gs = gridspec.GridSpec(4, 2, width_ratios=[1, 1],
+        gs = gridspec.GridSpec(4, 3, width_ratios=[1, 1, 1],
                                height_ratios=[1, 1, 1, 1])
 
         # CREATE A FIGURE
-        fig = plt.figure(figsize=(15, 15), dpi=80)
+        fig = plt.figure(figsize=(20, 15), dpi=80)
 
         # CREATE X-Y SUBPLOT WITH VISUALISATION OF INVERTED PENDULUM
         ax = fig.add_subplot(gs[:, 0])
@@ -113,6 +114,27 @@ def plot(model, animate, save):
         axdx.set_ylabel('v [m/s]')
         axdx.plot(model.t, dxs, '-', color='0.3', lw=3)
 
+        # CREATE FIS SUBPLOT
+        universe = 'force'
+        axfis = fig.add_subplot(gs[:, 2])
+        axfis.set_xlabel(universe)
+        axfis.set_ylabel(r'$\mu$')
+        axfis.set_xlim(fis.universes[universe][0], fis.universes[universe][-1])
+        axfis.set_ylim(0, 1)
+
+        # Adjust the subplot parameters to make the subplot square
+        fig_width, fig_height = fig.get_size_inches()
+        left, right = axfis.get_position().x0, axfis.get_position().x1
+        top, bottom = axfis.get_position().y1, axfis.get_position().y0 + 0.24
+        subplot_width = right - left
+        subplot_height = top - bottom
+
+        # Calculate the new height to make the subplot square
+        new_height = subplot_width * fig_width / fig_height
+
+        # Adjust the subplot position
+        axfis.set_position([left, bottom, subplot_width, new_height])
+
         # IF PLOT IS ABOUT TO BE SAVED, SET PROPER blit PARAMETER FOR ANIMATION FUNCTION
         if save:
             blit = False
@@ -138,6 +160,22 @@ def plot(model, animate, save):
             thisy = [0, y_pos[i]]                       # current cart's (x, y)
             thisdx = dxs[i]                             # current cart's velocity
             thisxdes = model.step(thist)                 # current x_des
+
+            # UPDATE FIS SUBPLOT
+            axfis.clear()
+            axfis.set_xlim(fis.universes[universe][0], fis.universes[universe][-1])
+            axfis.set_ylim(0, 1)
+
+            u = fis.universes[universe]
+            agg = aggs[i]
+            centroid = centroids[i]
+
+            axfis.fill_between(u, 0, agg, alpha=0.5, color='tab:blue')
+            axfis.plot([centroid, centroid], [0, np.max(agg)], '--', color='tab:blue')
+            axfis.text(centroid * 0.8, np.max(agg) * 0.9, f'{centroid:.2f}', color='tab:blue')
+
+            axfis.set_xlabel(universe)
+            axfis.set_ylabel(r'$\mu$')
 
             # UPDATE INVERTED PENDULUM'S POSITION
             line_pendulum.set_data(thisx, thisy)
@@ -165,7 +203,10 @@ def plot(model, animate, save):
             axdth.set_xlim(left=0, right=thist)
             axdx.set_xlim(left=0, right=thist)
 
-            return line_pendulum, cart, time_text, theta_text, xdes_text, ax, axth, axx, axdth, axdx, x_des_plot
+            for name, mf in fis.memfuncs[universe].items():
+                axfis.plot(u, mf['f'](u), '--', label=name, alpha=0.5, color='tab:orange')
+
+            return line_pendulum, cart, time_text, theta_text, xdes_text, ax, axth, axx, axdth, axdx, x_des_plot, axfis
 
         # INVOKE ANIMATION FUNCTION
         anim = animation.FuncAnimation(fig, animate, frames=range(1, len(model.t)),
@@ -174,7 +215,7 @@ def plot(model, animate, save):
         # IF SAVE IS TRUE
         if save:
             # SAVE ANIMATION AS GIF
-            writergif = animation.PillowWriter(fps=len(model.t) / model.t[-1])
+            writergif = animation.PillowWriter(fps=100)
             os.makedirs('../anims', exist_ok=True)
             anim.save("anims/anim_ip.gif", writer=writergif)
         else:
