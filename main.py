@@ -7,7 +7,7 @@ from fis import initialize_fis
 
 
 def animate_aggregation(ip, fis, aggs, centroids, universe):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 8))
 
     def init():
         ax.set_xlim(fis.universes[universe][0], fis.universes[universe][-1])
