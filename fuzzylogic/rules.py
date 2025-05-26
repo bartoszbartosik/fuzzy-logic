@@ -5,26 +5,12 @@ import numpy as np
 from fuzzylogic.structs import Universe, LinguisticVariable
 
 
-def negation(p: Callable):
-    def activation(x):
-        return np.ones_like(p(x)) - p(x)
-    return activation
+def conjunction(x: list):
+    return np.min(list)
 
 
-def conjunction(p: list[Callable], q: Callable):
-    def activation(x, domain):
-        return __run(__and(x, p), q, domain)
-    return activation
-
-
-def disj(x: list[float], domain: np.ndarray, p: list[tuple[Universe, str]], q: tuple[Universe, str]):
-    return __run(__or(x, p), q, domain)
-
-
-def disjunction(p: list[Callable], q: Callable):
-    def activation(x, domain):
-        return __run(__or(x, p), q, domain)
-    return activation
+def disjunction(x: list):
+    return np.max(list)
 
 
 def implication(p: Callable, q: Callable):
@@ -63,7 +49,9 @@ class Rule:
         self.p = _terms2dict(p)
         self.rule = rule
 
-        self.target_muvals = q[0].terms[q[1]](q[0].domain)
+        self.target_universe = q[0]
+        self.target_term = q[1]
+        self.target_muvals = self.target_universe.terms[self.target_term](self.target_universe.domain)
 
     def __call__(self, x: list[LinguisticVariable]):
         # TODO: come up with more concise way to identify mu for each x
@@ -71,9 +59,32 @@ class Rule:
         # Compute activations for each rule (concise)
         muvals = [self.p[linvar.universe][term](linvar.value) for linvar in x for term in self.p[linvar.universe]]
 
+        # Compute activations for each rule (full)
+        muvals = {}
+        for linvar in x:
+            for term in self.p[linvar.universe]:
+                muvals[linvar.universe][term] = self.p[linvar.universe][term](linvar.value)
+
+
         y = np.min(muvals)
         a = np.fmin(muvals, self.target_muvals)
 
+    def __str__(self):
+        operator = None
+        match str(self.rule):
+            case str(conjunction):
+                operator = 'AND'
+            case str(disjunction):
+                operator = 'OR'
+            case str(implication):
+                operator = 'IMPLIES'
 
+        if operator is None:
+            raise ValueError(f'Unknown rule type: {self.rule}')
+
+        return f'IF [{f" {operator.upper()} ".join([f"{universe} IS {term}" for universe in self.p for term in self.p[universe]])}] THEN {self.target_universe} IS {self.target_term}'
+
+    def __repr__(self):
+        return self.__str__()
 
 
