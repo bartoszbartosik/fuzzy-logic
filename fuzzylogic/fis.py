@@ -1,53 +1,55 @@
 import numpy as np
-from matplotlib import pyplot as plt
+from .structs import Universe, LinguisticVariable
 
-from typing import Callable
+from typing import Callable, Iterable
 
 
 class FuzzyInferenceSystem:
 
-    def __init__(self, **kwargs):
-        self.universes = kwargs
-        self.memfuncs = {key: {} for key in self.universes.keys()}
+    def __init__(self, *args):
+        self.universes = args
         self.rules = []
 
 
-    def aggregate(self, x, universe):
-
-        # Fetch universe domain
-        u = self.universes[universe]
+    def aggregate(self, x, domain):
 
         # Compute activations for each rule
-        activations = self.__apply_rules(x, u)
+        activations = self.__apply_rules(x, domain)
 
-        return u, np.max(activations, axis=0)
+        return np.max(activations, axis=0)
 
 
     def __apply_rules(self, x, u):
         return [rule(x, u) for rule in self.rules]
 
 
-    def defuzz(self, u, agg):
+    def defuzz(self, agg, domain):
         # Centroid defuzzification
-        return np.sum(agg*u)/np.sum(agg)
+        return np.sum(agg * domain)/np.sum(agg)
 
 
-    def add_rule(self, rule: Callable):
+    def add_rule(self, rule: callable):
         self.rules.append(rule)
 
 
-    def add_membership_function(self, universe, name: str, memfunc: Callable):
-        assert universe in self.universes.keys(), 'Universe not found'
-        self.memfuncs[universe].update({name: {'f': memfunc}})
+    def infer(self, x: list[LinguisticVariable] | list[float], universe: Universe):
+        assert universe in self.universes
 
+        # Compute membership values
+        mu_x = {xx.universe: self.__compute_mfvals(xx) for xx in x}
 
-    def infer(self, x: np.ndarray, universe: str):
-        assert universe in self.universes.keys(), 'Universe not found'
+        # Apply rules
+        for rule in self.rules:
+            rule(x, universe.domain)
 
         # Aggregate rules
-        u, agg = self.aggregate(x, universe)
+        agg = self.aggregate([xx.value for xx in x], universe.domain)
 
         # Defuzzify
-        crisp = self.defuzz(u, agg)
+        crisp = self.defuzz(agg, universe.domain)
 
         return crisp
+
+
+    def __compute_mfvals(self, x: LinguisticVariable):
+        return {term: mu(x.value) for term, mu in x.universe.terms}
