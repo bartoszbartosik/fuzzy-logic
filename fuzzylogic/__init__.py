@@ -1,1 +1,0 @@
-from .fis import FuzzyInferenceSystem

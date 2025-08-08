@@ -6,7 +6,7 @@ The `main.py` file contains a sample usage of the FIS, where the inverted pendul
 using fuzzy control through inferences of angle and angular velocity each point at a time.
 
 ## Membership functions
-![membership functions](anims/memfuncs.png "membership functions")
+![membership functions](resources/anims/memfuncs.png "membership functions")
 
 ## Results
-![](anims/anim_ip.gif) 
+![](resources/anims/anim_ip.gif) 
