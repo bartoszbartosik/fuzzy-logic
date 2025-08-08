@@ -1,4 +1,3 @@
-from typing import Callable
 import numpy as np
 
 from .structs import LinguisticVariable, Rule
@@ -16,7 +15,7 @@ class FuzzyRuleEngine:
         return np.sum(agg * domain)/np.sum(agg)
 
 
-    def add_rule(self, rule: Callable):
+    def add_rule(self, rule: Rule):
         self.rules.append(rule)
 
 
