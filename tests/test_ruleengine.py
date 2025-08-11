@@ -4,6 +4,8 @@ import numpy as np
 from src.fuzzylogic import FuzzyRuleEngine
 from src.fuzzylogic.functions import trimf
 from src.fuzzylogic.structs import Universe, LinguisticVariable, Rule
+from src.fuzzylogic.config import Config
+from src.fuzzylogic import operators
 
 
 class TestFuzzyRuleEngine(unittest.TestCase):
@@ -11,41 +13,48 @@ class TestFuzzyRuleEngine(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures before each test method."""
+        pass
+
+
+    def test_tipping_problem(self):
+        """Test the original tip calculation scenario from demo."""
+
+        # Set configuration for t-norm and t-conorm
+        Config.tnorm = operators.minimum
+        Config.tconorm = operators.maximum
+
         # Define universes
-        self.quality = Universe('quality', np.arange(0, 11, 1))
-        self.service = Universe('service', np.arange(0, 11, 1))
-        self.tip = Universe('tip', np.arange(0, 26, 1))
+        quality = Universe('quality', np.arange(0, 11, 1))
+        service = Universe('service', np.arange(0, 11, 1))
+        tip = Universe('tip', np.arange(0, 26, 1))
 
         # Define membership functions
-        self.quality.low = trimf((0, 0, 5))
-        self.quality.medium = trimf((0, 5, 10))
-        self.quality.high = trimf((5, 10, 10))
-        self.service.low = trimf((0, 0, 5))
-        self.service.medium = trimf((0, 5, 10))
-        self.service.high = trimf((5, 10, 10))
-        self.tip.low = trimf((0, 0, 13))
-        self.tip.medium = trimf((0, 13, 25))
-        self.tip.high = trimf((13, 25, 25))
-
-        # Create rule engine
-        self.fis = FuzzyRuleEngine()
+        quality.low = trimf((0, 0, 5))
+        quality.medium = trimf((0, 5, 10))
+        quality.high = trimf((5, 10, 10))
+        service.low = trimf((0, 0, 5))
+        service.medium = trimf((0, 5, 10))
+        service.high = trimf((5, 10, 10))
+        tip.low = trimf((0, 0, 13))
+        tip.medium = trimf((0, 13, 25))
+        tip.high = trimf((13, 25, 25))
 
         # Define rules
-        self.rule_1 = Rule(self.quality.low & self.service.low, self.tip.low)
-        self.rule_2 = Rule(self.service.medium, self.tip.medium)
-        self.rule_3 = Rule(self.quality.high | self.service.high, self.tip.high)
+        rule_1 = Rule(quality.low & service.low, tip.low)
+        rule_2 = Rule(service.medium, tip.medium)
+        rule_3 = Rule(quality.high | service.high, tip.high)
 
+        # Create rule engine
+        fis = FuzzyRuleEngine()
 
-    def test_original_demo_scenario(self):
-        """Test the original tip calculation scenario from demo."""
         # Add rules to engine
-        self.fis.add_rule(self.rule_1)
-        self.fis.add_rule(self.rule_2)
-        self.fis.add_rule(self.rule_3)
+        fis.add_rule(rule_1)
+        fis.add_rule(rule_2)
+        fis.add_rule(rule_3)
 
         # Test inference with the original demo values
         lvar = LinguisticVariable(quality=6.5, service=9.8)
-        result = self.fis.infer(lvar, self.tip)
+        result = fis.infer(lvar)
 
         # Validate the result
         self.assertIsInstance(result, (float, np.floating))

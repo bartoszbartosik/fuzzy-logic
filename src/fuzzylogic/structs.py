@@ -2,7 +2,9 @@ from typing import Callable
 
 import numpy as np
 
-from .auxiliary import _evaluate_tree
+from . import operators
+from .config import Config
+
 
 
 class Universe:
@@ -48,6 +50,8 @@ class Universe:
 
 
 class LinguisticVariable:
+    __slots__ = ['_data']
+
     def __init__(self, **kwargs):
         self._data = {}
         for key, value in kwargs.items():
@@ -61,7 +65,7 @@ class LinguisticVariable:
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
     def __setattr__(self, name, value):
-        if name.startswith('_'):
+        if name in self.__slots__:
             super().__setattr__(name, value)
         else:
             if isinstance(value, (int, float, np.ndarray)):
@@ -101,32 +105,27 @@ class FuzzySet:
         self.name = name
         self.func = func
 
-    def __call__(self, x: LinguisticVariable) -> dict:
+    def __call__(self, x: LinguisticVariable) -> float | np.ndarray:
         return self.func(x[self.universe.name])
 
     def __or__(self, other):
-        if isinstance(other, FuzzyExpressionTree):
-            return other | self
-        else:
-            if self.universe == other.universe:
-                universe = self.universe
-                name = self.name + '|' + other.name
-                func = lambda x: np.fmax(self.func(x), other.func(x))
-                return FuzzySet(universe, name, func)
-            else:
-                return FuzzyExpressionTree(self, other, 'OR')
+        return self.__compare(other, Config.tconorm, operators._TCONORM_STR, operators._TCONORM_SYMBOL_STR)
 
     def __and__(self, other):
+        return self.__compare(other, Config.tnorm, operators._TNORM_STR, operators._TNORM_SYMBOL_STR)
+
+    def __compare(self, other, operator, operator_str, operator_symbol_str):
         if isinstance(other, FuzzyExpressionTree):
             return other | self
         else:
             if self.universe == other.universe:
                 universe = self.universe
-                name = self.name + '&' + other.name
-                func = lambda x: np.fmin(self.func(x), other.func(x))
+                name = self.name + operator_symbol_str + other.name
+                func = lambda x: operator(self.func(x), other.func(x))
                 return FuzzySet(universe, name, func)
             else:
-                return FuzzyExpressionTree(self, other, 'AND')
+                return FuzzyExpressionTree(self, other, operator, operator_str)
+
 
     def __str__(self):
         return f'{self.universe}.{self.name}'
@@ -136,35 +135,23 @@ class FuzzySet:
 
 
 class FuzzyExpressionTree:
-    def __init__(self, A: FuzzySet, B: FuzzySet, condition):
+    def __init__(self, A: FuzzySet, B: FuzzySet, operator, operator_str: str):
         self._sets = {
-            condition: {
+            operator: {
                 A.universe.name: A,
                 B.universe.name: B
             }
         }
-        self._str = f'({A} {condition} {B})'
+        self._str = f'({A} {operator_str} {B})'
 
-    def __call__(self, x: LinguisticVariable):
-        return _evaluate_tree(self._sets, x)
+    def __call__(self, x: LinguisticVariable) -> float:
+        return self.__evaluate_tree(self._sets, x)
 
     def __or__(self, other):
-        condition = 'OR'
-        if isinstance(other, FuzzyExpressionTree):
-            self._sets = {condition: {**self._sets, **other._sets}}
-        elif isinstance(other, FuzzySet):
-            self._sets = {condition: {**self._sets, other.universe.name: other}}
-        self._str = f'({self._str} {condition} {other})'
-        return self
+        return self.__build_tree(other, Config.tconorm, operators._TCONORM_STR)
 
     def __and__(self, other):
-        condition = 'AND'
-        if isinstance(other, FuzzyExpressionTree):
-            self._sets = {condition: {**self._sets, **other._sets}}
-        elif isinstance(other, FuzzySet):
-            self._sets = {condition: {**self._sets, other.universe.name: other}}
-        self._str = f'({self._str} {condition} {other})'
-        return self
+        return self.__build_tree(other, Config.tnorm, operators._TNORM_STR)
 
     def __str__(self):
         return self._str
@@ -172,13 +159,39 @@ class FuzzyExpressionTree:
     def __repr__(self):
         return self._str
 
+    def __build_tree(self, other, operator: Callable, operator_str: str):
+        if isinstance(other, FuzzyExpressionTree):
+            self._sets = {operator: {**self._sets, **other._sets}}
+        elif isinstance(other, FuzzySet):
+            self._sets = {operator: {**self._sets, other.universe.name: other}}
+        self._str = f'({self._str} {operator_str} {other})'
+        return self
+
+    @staticmethod
+    def __evaluate_tree(sets: dict, lvar: LinguisticVariable) -> float:
+
+        operator = next(iter(sets))
+        children = [{child: sets[operator][child]} for child in sets[operator]]
+
+        values = []
+        for child in children:
+            node = next(iter(child.values()))
+            if isinstance(node, FuzzySet):
+                value = node(lvar)
+                values.append(value)
+            else:
+                value = FuzzyExpressionTree.__evaluate_tree(child, lvar)
+                values.append(value)
+
+        return operator(*values)
+
 
 class Rule:
     def __init__(self, p: FuzzySet | FuzzyExpressionTree, q: FuzzySet):
         self.p = p
         self.q = q
 
-    def __call__(self, x: LinguisticVariable):
+    def __call__(self, x: LinguisticVariable) -> float | np.ndarray:
         x_q = LinguisticVariable.from_dict({self.q.universe.name: self.q.universe.domain})
         return np.fmin(self.p(x), self.q(x_q))
 
