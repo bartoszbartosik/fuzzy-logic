@@ -56,6 +56,11 @@ class TestFuzzyRuleEngine(unittest.TestCase):
         lvar = LinguisticVariable(quality=6.5, service=9.8)
         result = fis.infer(lvar)
 
+        quality.plot()
+        service.plot()
+        tip.plot()
+        fis.plot()
+
         # Validate the result
         self.assertIsInstance(result, (float, np.floating))
         self.assertAlmostEqual(result, 20.24, places=2)

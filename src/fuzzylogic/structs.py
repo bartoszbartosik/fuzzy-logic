@@ -1,6 +1,7 @@
 from typing import Callable
 
 import numpy as np
+from matplotlib import pyplot as plt
 
 from . import operators
 from .config import Config
@@ -16,7 +17,6 @@ class Universe:
         self._domain: np.ndarray = domain
         self._sets: dict = {}
 
-
     @property
     def name(self) -> str:
         return self._name
@@ -24,6 +24,16 @@ class Universe:
     @property
     def domain(self) -> np.ndarray:
         return self._domain
+
+    def plot(self):
+        plt.figure()
+        for fuzzy_set in self._sets.values():
+            fuzzy_set._plot()
+        plt.xlabel(self._name)
+        plt.ylabel(f'{r'$\mu$'}({self._name})')
+        plt.grid()
+        plt.legend()
+        plt.show()
 
     def __setattr__(self, name, func: Callable):
         if name in self.__slots__:
@@ -82,22 +92,6 @@ class LinguisticVariable:
         items = [f"{k}={v}" for k, v in self._data.items()]
         return f"[{', '.join(items)}]"
 
-    def to_dict(self):
-        return self._data.copy()
-
-    @classmethod
-    def from_dict(cls, data):
-        for key, value in data.items():
-            setattr(cls, key, value)
-        return LinguisticVariable(**data)
-
-    @classmethod
-    def from_json_file(cls, file_path):
-        import json
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-        return cls(**data)
-
 
 class FuzzySet:
     def __init__(self, universe: Universe, name: str, func: Callable):
@@ -126,12 +120,16 @@ class FuzzySet:
             else:
                 return FuzzyExpressionTree(self, other, operator, operator_str)
 
-
     def __str__(self):
         return f'{self.universe}.{self.name}'
 
     def __repr__(self):
         return str(self)
+
+    def _plot(self):
+        x = self.universe.domain
+        y = self(LinguisticVariable(**{self.universe.name: x}))
+        plt.plot(x, y, label=str(self))
 
 
 class FuzzyExpressionTree:
@@ -192,7 +190,7 @@ class Rule:
         self.q = q
 
     def __call__(self, x: LinguisticVariable) -> float | np.ndarray:
-        x_q = LinguisticVariable.from_dict({self.q.universe.name: self.q.universe.domain})
+        x_q = LinguisticVariable(**{self.q.universe.name: self.q.universe.domain})
         return np.fmin(self.p(x), self.q(x_q))
 
     def __str__(self):
