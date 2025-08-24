@@ -8,58 +8,6 @@ from .config import Config
 
 
 
-class Universe:
-
-    __slots__ = ['_name', '_domain', '_sets']
-
-    def __init__(self, name: str, domain: np.ndarray):
-        self._name: str = name
-        self._domain: np.ndarray = domain
-        self._sets: dict = {}
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def domain(self) -> np.ndarray:
-        return self._domain
-
-    def plot(self):
-        plt.figure()
-        for fuzzy_set in self._sets.values():
-            fuzzy_set._plot()
-        plt.xlabel(self._name)
-        plt.ylabel(f'{r'$\mu$'}({self._name})')
-        plt.ylim(-0.1, 1.1)
-        plt.grid()
-        plt.legend()
-        plt.show()
-
-    def __setattr__(self, name, func: Callable):
-        if name in self.__slots__:
-            super().__setattr__(name, func)
-        else:
-            assert str.isidentifier(name), f'Fuzzy Set name be an identifier, got {name}'
-            self._sets[name] = FuzzySet(self, name, func)
-
-    def __getattr__(self, item):
-        if item in self._sets:
-            return self._sets[item]
-        raise KeyError(f'{item} not found in universe {self._name}')
-
-    def __eq__(self, other):
-        if not isinstance(other, Universe):
-            return False
-        return all([
-            self._name == other._name,
-            np.array_equal(self._domain, other._domain)
-        ])
-
-    def __repr__(self):
-        return self._name
-
-
 class LinguisticVariable:
     __slots__ = ['_data']
 
@@ -92,6 +40,106 @@ class LinguisticVariable:
     def __repr__(self):
         items = [f"{k}={v}" for k, v in self._data.items()]
         return f"[{', '.join(items)}]"
+
+
+class Arithmetics:
+
+    def __call__(self, *args): pass
+
+    def __add__(self, other): return self.__evaluate(other, lambda x, y: x + y, '+')
+
+    def __sub__(self, other): return self.__evaluate(other, lambda x, y: x - y, '-')
+
+    def __mul__(self, other): return self.__evaluate(other, lambda x, y: x * y, '*')
+
+    def __truediv__(self, other): return self.__evaluate(other, lambda x, y: x / y, '/')
+
+    def __pow__(self, other): return self.__evaluate(other, lambda x, y: x ** y, '**')
+
+    def __rpow__(self, other): return self.__evaluate(other, lambda x, y: y ** x, '**')
+
+    def __radd__(self, other): return self.__add__(other)
+
+    def __rsub__(self, other): return self.__evaluate(other, lambda x, y: y - x, '-')
+
+    def __rmul__(self, other): return self.__mul__(other)
+
+    def __rtruediv__(self, other): return self.__evaluate(other, lambda x, y: y / x, '/')
+
+    def __evaluate(self, other, operator: Callable, operator_str: str):
+        if isinstance(other, (int, float)):
+            return Expression(lambda x: operator(self(x), other), f'({self} {operator_str} {other})')
+        elif isinstance(other, (Universe, Expression)):
+            return Expression(lambda x: operator(self(x), other(x)), f'({self} {operator_str} {other})')
+        else:
+            raise ValueError(f'Cannot apply operator with {type(other)}')
+
+
+class Expression(Arithmetics):
+    def __init__(self, func: Callable, repr: str):
+        self.func = func
+        self.__str = repr
+
+    def __call__(self, x: LinguisticVariable) -> float:
+        return self.func(x)
+
+    def __repr__(self):
+        return self.__str
+
+
+class Universe(Arithmetics):
+
+    __slots__ = ['_name', '_domain', '_sets']
+
+    def __init__(self, name: str, domain: np.ndarray):
+        self._name: str = name
+        self._domain: np.ndarray = domain
+        self._sets: dict = {}
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def domain(self) -> np.ndarray:
+        return self._domain
+
+    def plot(self):
+        plt.figure()
+        for fuzzy_set in self._sets.values():
+            fuzzy_set._plot()
+        plt.xlabel(self._name)
+        plt.ylabel(f'{r'$\mu$'}({self._name})')
+        plt.ylim(-0.1, 1.1)
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+    def __call__(self, x: LinguisticVariable):
+        return x[self._name]
+
+    def __setattr__(self, name, func: Callable):
+        if name in self.__slots__:
+            super().__setattr__(name, func)
+        else:
+            assert str.isidentifier(name), f'Fuzzy Set name be an identifier, got {name}'
+            self._sets[name] = FuzzySet(self, name, func)
+
+    def __getattr__(self, item):
+        if item in self._sets:
+            return self._sets[item]
+        raise KeyError(f'{item} not found in universe {self._name}')
+
+    def __eq__(self, other):
+        if not isinstance(other, Universe):
+            return False
+        return all([
+            self._name == other._name,
+            np.array_equal(self._domain, other._domain)
+        ])
+
+    def __repr__(self):
+        return self._name
 
 
 class FuzzySet:
@@ -200,4 +248,9 @@ class Rule:
     def __repr__(self):
         return str(self)
 
+
+class TSKRule:
+    def __init__(self, p: FuzzySet | FuzzyExpressionTree, func: Callable):
+        self.p = p
+        self.func = func
 
