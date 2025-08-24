@@ -2,10 +2,7 @@ import numpy as np
 
 
 _TNORM_STR = 'AND'
-_TNORM_SYMBOL_STR = '&'
 _TCONORM_STR = 'OR'
-_TCONORM_SYMBOL_STR = '|'
-
 
 # ----------------- #
 #   T - N O R M S   #

@@ -3,9 +3,7 @@ from typing import Callable
 import numpy as np
 from matplotlib import pyplot as plt
 
-from . import operators
-from .config import Config
-
+from ._expressionengine import _ExpressionEngine, _Expression
 
 
 class LinguisticVariable:
@@ -42,53 +40,7 @@ class LinguisticVariable:
         return f"[{', '.join(items)}]"
 
 
-class Arithmetics:
-
-    def __call__(self, *args): pass
-
-    def __add__(self, other): return self.__evaluate(other, lambda x, y: x + y, '+')
-
-    def __sub__(self, other): return self.__evaluate(other, lambda x, y: x - y, '-')
-
-    def __mul__(self, other): return self.__evaluate(other, lambda x, y: x * y, '*')
-
-    def __truediv__(self, other): return self.__evaluate(other, lambda x, y: x / y, '/')
-
-    def __pow__(self, other): return self.__evaluate(other, lambda x, y: x ** y, '**')
-
-    def __rpow__(self, other): return self.__evaluate(other, lambda x, y: y ** x, '**')
-
-    def __radd__(self, other): return self.__add__(other)
-
-    def __rsub__(self, other): return self.__evaluate(other, lambda x, y: y - x, '-')
-
-    def __rmul__(self, other): return self.__mul__(other)
-
-    def __rtruediv__(self, other): return self.__evaluate(other, lambda x, y: y / x, '/')
-
-    def __evaluate(self, other, operator: Callable, operator_str: str):
-        if isinstance(other, (int, float)):
-            return Expression(lambda x: operator(self(x), other), f'({self} {operator_str} {other})')
-        elif isinstance(other, (Universe, Expression)):
-            return Expression(lambda x: operator(self(x), other(x)), f'({self} {operator_str} {other})')
-        else:
-            raise ValueError(f'Cannot apply operator with {type(other)}')
-
-
-class Expression(Arithmetics):
-    def __init__(self, func: Callable, repr: str):
-        self.func = func
-        self.__str = repr
-
-    def __call__(self, x: LinguisticVariable) -> float:
-        return self.func(x)
-
-    def __repr__(self):
-        return self.__str
-
-
-class Universe(Arithmetics):
-
+class Universe(_ExpressionEngine):
     __slots__ = ['_name', '_domain', '_sets']
 
     def __init__(self, name: str, domain: np.ndarray):
@@ -123,7 +75,7 @@ class Universe(Arithmetics):
             super().__setattr__(name, func)
         else:
             assert str.isidentifier(name), f'Fuzzy Set name be an identifier, got {name}'
-            self._sets[name] = FuzzySet(self, name, func)
+            self._sets[name] = _FuzzySet(self, name, func)
 
     def __getattr__(self, item):
         if item in self._sets:
@@ -142,7 +94,7 @@ class Universe(Arithmetics):
         return self._name
 
 
-class FuzzySet:
+class _FuzzySet(_ExpressionEngine):
     def __init__(self, universe: Universe, name: str, func: Callable):
         self.universe = universe
         self.name = name
@@ -150,24 +102,6 @@ class FuzzySet:
 
     def __call__(self, x: LinguisticVariable) -> float | np.ndarray:
         return self.func(x[self.universe.name])
-
-    def __or__(self, other):
-        return self.__compare(other, Config.tconorm, operators._TCONORM_STR, operators._TCONORM_SYMBOL_STR)
-
-    def __and__(self, other):
-        return self.__compare(other, Config.tnorm, operators._TNORM_STR, operators._TNORM_SYMBOL_STR)
-
-    def __compare(self, other, operator, operator_str, operator_symbol_str):
-        if isinstance(other, FuzzyExpressionTree):
-            return other | self
-        else:
-            if self.universe == other.universe:
-                universe = self.universe
-                name = self.name + operator_symbol_str + other.name
-                func = lambda x: operator(self.func(x), other.func(x))
-                return FuzzySet(universe, name, func)
-            else:
-                return FuzzyExpressionTree(self, other, operator, operator_str)
 
     def __str__(self):
         return f'{self.universe}.{self.name}'
@@ -181,64 +115,26 @@ class FuzzySet:
         plt.plot(x, y, label=str(self))
 
 
-class FuzzyExpressionTree:
-    def __init__(self, A: FuzzySet, B: FuzzySet, operator, operator_str: str):
-        self._sets = {
-            operator: {
-                A.universe.name: A,
-                B.universe.name: B
-            }
-        }
-        self._str = f'({A} {operator_str} {B})'
-
-    def __call__(self, x: LinguisticVariable) -> float:
-        return self.__evaluate_tree(self._sets, x)
-
-    def __or__(self, other):
-        return self.__build_tree(other, Config.tconorm, operators._TCONORM_STR)
-
-    def __and__(self, other):
-        return self.__build_tree(other, Config.tnorm, operators._TNORM_STR)
-
-    def __str__(self):
-        return self._str
-
-    def __repr__(self):
-        return self._str
-
-    def __build_tree(self, other, operator: Callable, operator_str: str):
-        if isinstance(other, FuzzyExpressionTree):
-            self._sets = {operator: {**self._sets, **other._sets}}
-        elif isinstance(other, FuzzySet):
-            self._sets = {operator: {**self._sets, other.universe.name: other}}
-        self._str = f'({self._str} {operator_str} {other})'
-        return self
-
-    @staticmethod
-    def __evaluate_tree(sets: dict, lvar: LinguisticVariable) -> float:
-
-        operator = next(iter(sets))
-        children = [{child: sets[operator][child]} for child in sets[operator]]
-
-        values = []
-        for child in children:
-            node = next(iter(child.values()))
-            if isinstance(node, FuzzySet):
-                value = node(lvar)
-                values.append(value)
-            else:
-                value = FuzzyExpressionTree.__evaluate_tree(child, lvar)
-                values.append(value)
-
-        return operator(*values)
-
-
 class Rule:
-    def __init__(self, p: FuzzySet | FuzzyExpressionTree, q: FuzzySet):
+    def __new__(cls, p: _FuzzySet | _Expression, q: _FuzzySet | Universe | _Expression | float):
+        if isinstance(q, _FuzzySet):
+            return super().__new__(_MamdaniRule)
+        else:
+            return super().__new__(_TSKRule)
+
+    def __call__(self, x: LinguisticVariable) -> float | np.ndarray: pass
+
+    def __init__(self, p: _FuzzySet | _Expression, q: _FuzzySet | Universe | _Expression | float):
         self.p = p
         self.q = q
 
-    def __call__(self, x: LinguisticVariable) -> float | np.ndarray:
+
+class _MamdaniRule(Rule):
+    def __init__(self, p: _FuzzySet | _Expression, q: _FuzzySet):
+        super().__init__(p, q)
+        self.target = self.q.universe
+
+    def __call__(self, x: LinguisticVariable) -> np.ndarray:
         x_q = LinguisticVariable(**{self.q.universe.name: self.q.universe.domain})
         return np.fmin(self.p(x), self.q(x_q))
 
@@ -249,8 +145,16 @@ class Rule:
         return str(self)
 
 
-class TSKRule:
-    def __init__(self, p: FuzzySet | FuzzyExpressionTree, func: Callable):
-        self.p = p
-        self.func = func
+class _TSKRule(Rule):
+    def __init__(self, p: _FuzzySet | _Expression, q: Universe | _Expression | float):
+        super().__init__(p, q)
+
+    def __call__(self, x: LinguisticVariable) -> float:
+        return self.p(x) * self.q(x)
+
+    def __str__(self):
+        return f'IF {self.p} THEN {self.q}'
+
+    def __repr__(self):
+        return str(self)
 
