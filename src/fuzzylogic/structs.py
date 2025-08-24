@@ -31,6 +31,7 @@ class Universe:
             fuzzy_set._plot()
         plt.xlabel(self._name)
         plt.ylabel(f'{r'$\mu$'}({self._name})')
+        plt.ylim(-0.1, 1.1)
         plt.grid()
         plt.legend()
         plt.show()

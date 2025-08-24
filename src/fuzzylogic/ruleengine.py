@@ -56,6 +56,7 @@ class FuzzyRuleEngine:
         plt.text(self.crisp+self.crisp*0.01, self._target._domain[0], f'{self.crisp:.2f}', horizontalalignment='left', verticalalignment='bottom', color='tab:blue', fontweight='bold')
         plt.xlabel(self._target.name)
         plt.ylabel(f'{r"$\mu$"}({self._target.name})')
+        plt.ylim(-0.1, 1.1)
         plt.grid()
         plt.legend()
         plt.show()
